@@ -14,7 +14,7 @@ fn decode_integer(input: &[u8]) -> Result<(Bencode, &[u8]), String> {
         .position(|&x| x == b'e')
         .ok_or_else(|| "No end marker found")?;
 
-    let num = std::str::from_utf8(&input[..end_position])
+    let num = std::str::from_utf8(&input[1..end_position])
         .map_err(|_| "invalid utf8 sequence".to_string())?
         .parse::<i64>()
         .map_err(|_| "invalid number".to_string())?;
@@ -36,21 +36,23 @@ mod tests {
         #[test]
         fn it_decodes_integer() {
             let input = b"i123ei456e";
-            let result = decode_integer(&input[1..]);
+            let result = decode_integer(&input[..]);
             let expected = Ok((Bencode::Integer(123), &b"i456e"[..]));
 
             assert_eq!(result, expected);
         }
 
+        #[test]
         fn it_handles_invalid_integer() {
             let input = b"i12a3e";
-            let result = decode_integer(&input[1..]);
+            let result = decode_integer(&input[..]);
             assert!(result.is_err());
         }
 
+        #[test]
         fn it_handles_no_end_marker() {
             let input = b"i123";
-            let result = decode_integer(&input[1..]);
+            let result = decode_integer(&input[..]);
             let expected = Err(String::from("No end marker found"));
 
             assert_eq!(result, expected);
