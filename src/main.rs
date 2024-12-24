@@ -8,14 +8,14 @@ enum Bencode {
     Dictionary(HashMap<Vec<u8>, Bencode>),
 }
 
-fn decode_integer(input: &[u8]) -> Bencode {
+fn decode_integer(input: &[u8]) -> Result<(Bencode, &[u8]), &'static str> {
     let end_position = input.iter().position(|&x| x == b'e').unwrap();
     let num = std::str::from_utf8(&input[..end_position])
         .unwrap()
         .parse::<i64>()
         .unwrap();
 
-    Bencode::Integer(num)
+    Ok((Bencode::Integer(num), &input[end_position+1..]))
 }
 
 fn main() {
@@ -28,7 +28,10 @@ mod tests {
 
     #[test]
     fn it_decodes_integer() {
-        let result = decode_integer(b"123e");
-        assert_eq!(result, Bencode::Integer(123));
+        let input = b"i123ei456e";
+        let result = decode_integer(&input[1..]);
+        let expected = Ok((Bencode::Integer(123), &b"i456e"[..]));
+
+        assert_eq!(result, expected);
     }
 }
