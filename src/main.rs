@@ -67,6 +67,7 @@ mod tests {
             assert_eq!(result, expected);
         }
 
+        #[test]
         fn it_decodes_strings() {
             let input = b"7:bencode";
             let result = decode(input);
@@ -82,8 +83,17 @@ mod tests {
         #[test]
         fn it_decodes_integer() {
             let input = b"i123e";
-            let result = decode_integer(&input[..]);
+            let result = decode_integer(input);
             let expected = Ok((Bencode::Integer(123), &b""[..]));
+
+            assert_eq!(result, expected);
+        }
+
+        #[test]
+        fn it_decodes_negative_integer() {
+            let input = b"i-42e";
+            let result = decode_integer(input);
+            let expected = Ok((Bencode::Integer(-42), &b""[..]));
 
             assert_eq!(result, expected);
         }
