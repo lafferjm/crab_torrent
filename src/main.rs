@@ -8,6 +8,14 @@ enum Bencode {
     Dictionary(HashMap<Vec<u8>, Bencode>),
 }
 
+fn decode(input: &[u8]) -> Result<(Bencode, &[u8]), String> {
+    match input.first() {
+        Some(b'i') => decode_integer(input),
+        Some(b'0'..=b'9') => decode_string(input),
+        _ => Err("invalid input".to_string()),
+    }
+}
+
 fn decode_integer(input: &[u8]) -> Result<(Bencode, &[u8]), String> {
     let end_position = input
         .iter()
@@ -45,7 +53,28 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use crate::{decode_integer, decode_string, Bencode};
+    use crate::{decode, decode_integer, decode_string, Bencode};
+
+    mod decode_tests {
+        use super::*;
+
+        #[test]
+        fn it_decodes_integers() {
+            let input = b"i42e";
+            let result = decode(input);
+            let expected = Ok((Bencode::Integer(42), &b""[..]));
+
+            assert_eq!(result, expected);
+        }
+
+        fn it_decodes_strings() {
+            let input = b"7:bencode";
+            let result = decode(input);
+            let expected = Ok((Bencode::String(b"bencode".to_vec()), &b""[..]));
+
+            assert_eq!(result, expected);
+        }
+    }
 
     mod decode_integer_tests {
         use super::*;
