@@ -12,6 +12,7 @@ fn decode(input: &[u8]) -> Result<(Bencode, &[u8]), String> {
     match input.first() {
         Some(b'i') => decode_integer(input),
         Some(b'0'..=b'9') => decode_string(input),
+        Some(b'l') => decode_list(input),
         _ => Err("invalid input".to_string()),
     }
 }
@@ -45,6 +46,12 @@ fn decode_string(input: &[u8]) -> Result<(Bencode, &[u8]), String> {
     let end = end_position + 1 + length;
 
     Ok((Bencode::String(input[start..end].to_vec()), &input[end..]))
+}
+
+fn decode_list(input: &[u8]) -> Result<(Bencode, &[u8]), String> {
+    let list: Vec<Bencode> = Vec::new();
+
+    Ok((Bencode::List(list), input))
 }
 
 fn main() {
