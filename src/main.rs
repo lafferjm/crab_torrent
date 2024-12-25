@@ -49,9 +49,16 @@ fn decode_string(input: &[u8]) -> Result<(Bencode, &[u8]), String> {
 }
 
 fn decode_list(input: &[u8]) -> Result<(Bencode, &[u8]), String> {
-    let list: Vec<Bencode> = Vec::new();
+    let mut list: Vec<Bencode> = Vec::new();
+    let mut rest = &input[1..];
 
-    Ok((Bencode::List(list), input))
+    while !rest.is_empty() && rest[0] != b'e' {
+        let (value, rest_input) = decode(rest)?;
+        list.push(value);
+        rest = rest_input;
+    }
+
+    Ok((Bencode::List(list), &rest[1..]))
 }
 
 fn main() {
@@ -79,6 +86,15 @@ mod tests {
             let input = b"7:bencode";
             let result = decode(input);
             let expected = Ok((Bencode::String(b"bencode".to_vec()), &b""[..]));
+
+            assert_eq!(result, expected);
+        }
+
+        #[test]
+        fn it_decodes_lists() {
+            let input = b"li42ee";
+            let result = decode(input);
+            let expected = Ok((Bencode::List(vec![Bencode::Integer(42)]), &b""[..]));
 
             assert_eq!(result, expected);
         }
@@ -176,6 +192,53 @@ mod tests {
             let result = decode_string(input);
 
             assert!(result.is_err());
+        }
+    }
+
+    mod decode_list_tests {
+        use super::*;
+
+        #[test]
+        fn it_decodes_list_with_one_element() {
+            let input = b"li42ee";
+            let result = decode(input);
+            let expected = Ok((Bencode::List(vec![Bencode::Integer(42)]), &b""[..]));
+
+            assert_eq!(result, expected);
+        }
+
+        #[test]
+        fn it_decodes_list_with_two_elements() {
+            let input = b"li42ei-20ee";
+            let result = decode(input);
+            let result_vector = vec![Bencode::Integer(42), Bencode::Integer(-20)];
+            let expected = Ok((Bencode::List(result_vector), &b""[..]));
+
+            assert_eq!(result, expected);
+        }
+
+        #[test]
+        fn it_decodes_list_with_mixed_elements() {
+            let input = b"li42e7:bencodee";
+            let result = decode(input);
+            let result_vector = vec![Bencode::Integer(42), Bencode::String(b"bencode".to_vec())];
+            let expected = Ok((Bencode::List(result_vector), &b""[..]));
+
+            assert_eq!(result, expected);
+        }
+
+        #[test]
+        fn it_decodes_list_with_list() {
+            let input = b"li42eli42eee";
+            let result = decode(input);
+            let nested_result = Bencode::List(vec![Bencode::Integer(42)]);
+
+            let expected = Ok((
+                Bencode::List(vec![Bencode::Integer(42), nested_result]),
+                &b""[..],
+            ));
+
+            assert_eq!(result, expected);
         }
     }
 }
