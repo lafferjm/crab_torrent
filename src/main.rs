@@ -13,6 +13,7 @@ fn decode(input: &[u8]) -> Result<(Bencode, &[u8]), String> {
         Some(b'i') => decode_integer(input),
         Some(b'0'..=b'9') => decode_string(input),
         Some(b'l') => decode_list(input),
+        Some(b'd') => decode_dictionary(input),
         _ => Err("invalid input".to_string()),
     }
 }
@@ -59,6 +60,12 @@ fn decode_list(input: &[u8]) -> Result<(Bencode, &[u8]), String> {
     }
 
     Ok((Bencode::List(list), &rest[1..]))
+}
+
+fn decode_dictionary(input: &[u8]) -> Result<(Bencode, &[u8]), String> {
+    let dictionary: HashMap<Vec<u8>, Bencode> = HashMap::new();
+
+    Ok((Bencode::Dictionary(dictionary), b""))
 }
 
 fn main() {
