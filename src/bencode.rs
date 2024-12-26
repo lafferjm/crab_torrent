@@ -88,6 +88,13 @@ mod tests {
     use std::collections::HashMap;
 
     #[test]
+    fn it_returns_error_on_invalid_input() {
+        let input = b"hello world";
+        let result = decode(input);
+
+        assert!(result.is_err());
+    }
+    #[test]
     fn it_decodes_integers() {
         let input = b"i42e";
         let result = decode(input);
