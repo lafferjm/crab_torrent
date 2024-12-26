@@ -63,9 +63,21 @@ fn decode_list(input: &[u8]) -> Result<(Bencode, &[u8]), String> {
 }
 
 fn decode_dictionary(input: &[u8]) -> Result<(Bencode, &[u8]), String> {
-    let dictionary: HashMap<Vec<u8>, Bencode> = HashMap::new();
+    let mut dictionary: HashMap<Vec<u8>, Bencode> = HashMap::new();
+    let mut remaining = &input[1..];
 
-    Ok((Bencode::Dictionary(dictionary), b""))
+    while !remaining.is_empty() && remaining[0] != b'e' {
+        let (key, rest) = decode_string(remaining)?;
+        let (value, rest) = decode(rest)?;
+
+        if let Bencode::String(key_value) = key {
+            dictionary.insert(key_value, value);
+        }
+
+        remaining = rest;
+    }
+
+    Ok((Bencode::Dictionary(dictionary), &remaining[1..]))
 }
 
 fn main() {
@@ -78,6 +90,7 @@ mod tests {
 
     mod decode_tests {
         use super::*;
+        use std::collections::HashMap;
 
         #[test]
         fn it_decodes_integers() {
@@ -102,6 +115,20 @@ mod tests {
             let input = b"li42ee";
             let result = decode(input);
             let expected = Ok((Bencode::List(vec![Bencode::Integer(42)]), &b""[..]));
+
+            assert_eq!(result, expected);
+        }
+
+        #[test]
+        fn it_decodes_dictionary() {
+            let input = b"d4:wiki7:bencode7:meaningi42ee";
+            let result = decode(input);
+
+            let mut expected_dict = HashMap::new();
+            expected_dict.insert(b"wiki".to_vec(), Bencode::String(b"bencode".to_vec()));
+            expected_dict.insert(b"meaning".to_vec(), Bencode::Integer(42));
+
+            let expected = Ok((Bencode::Dictionary(expected_dict), &b""[..]));
 
             assert_eq!(result, expected);
         }
@@ -204,11 +231,12 @@ mod tests {
 
     mod decode_list_tests {
         use super::*;
+        use crate::decode_list;
 
         #[test]
         fn it_decodes_list_with_one_element() {
             let input = b"li42ee";
-            let result = decode(input);
+            let result = decode_list(input);
             let expected = Ok((Bencode::List(vec![Bencode::Integer(42)]), &b""[..]));
 
             assert_eq!(result, expected);
@@ -217,7 +245,7 @@ mod tests {
         #[test]
         fn it_decodes_list_with_two_elements() {
             let input = b"li42ei-20ee";
-            let result = decode(input);
+            let result = decode_list(input);
             let result_vector = vec![Bencode::Integer(42), Bencode::Integer(-20)];
             let expected = Ok((Bencode::List(result_vector), &b""[..]));
 
@@ -227,7 +255,7 @@ mod tests {
         #[test]
         fn it_decodes_list_with_mixed_elements() {
             let input = b"li42e7:bencodee";
-            let result = decode(input);
+            let result = decode_list(input);
             let result_vector = vec![Bencode::Integer(42), Bencode::String(b"bencode".to_vec())];
             let expected = Ok((Bencode::List(result_vector), &b""[..]));
 
@@ -237,13 +265,51 @@ mod tests {
         #[test]
         fn it_decodes_list_with_list() {
             let input = b"li42eli42eee";
-            let result = decode(input);
+            let result = decode_list(input);
             let nested_result = Bencode::List(vec![Bencode::Integer(42)]);
 
             let expected = Ok((
                 Bencode::List(vec![Bencode::Integer(42), nested_result]),
                 &b""[..],
             ));
+
+            assert_eq!(result, expected);
+        }
+    }
+
+    mod decode_dictionary_tests {
+        use super::*;
+        use crate::decode_dictionary;
+        use std::collections::HashMap;
+
+        #[test]
+        fn it_decodes_dictionary() {
+            let input = b"d4:wiki7:bencode7:meaningi42ee";
+            let result = decode_dictionary(input);
+
+            let mut expected_dict = HashMap::new();
+            expected_dict.insert(b"wiki".to_vec(), Bencode::String(b"bencode".to_vec()));
+            expected_dict.insert(b"meaning".to_vec(), Bencode::Integer(42));
+
+            let expected = Ok((Bencode::Dictionary(expected_dict), &b""[..]));
+
+            assert_eq!(result, expected);
+        }
+
+        #[test]
+        fn it_decodes_nested_dictionaries() {
+            let input = b"d3:foo3:bar3:bazd3:boo4:bump5:blasti42eee";
+            let result = decode_dictionary(input);
+
+            let mut inner_dict = HashMap::new();
+            inner_dict.insert(b"boo".to_vec(), Bencode::String(b"bump".to_vec()));
+            inner_dict.insert(b"blast".to_vec(), Bencode::Integer(42));
+
+            let mut outer_dict = HashMap::new();
+            outer_dict.insert(b"foo".to_vec(), Bencode::String(b"bar".to_vec()));
+            outer_dict.insert(b"baz".to_vec(), Bencode::Dictionary(inner_dict));
+
+            let expected = Ok((Bencode::Dictionary(outer_dict), &b""[..]));
 
             assert_eq!(result, expected);
         }
