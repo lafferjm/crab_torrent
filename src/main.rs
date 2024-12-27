@@ -12,9 +12,9 @@ fn main() -> Result<(), String> {
 
     let torrent_name = &args[1];
     let file_contents = fs::read(torrent_name).expect("Couldn't read torrent file");
-    let decoded_file = decode(&file_contents).unwrap();
+    let (decoded_file, _) = decode(&file_contents).unwrap();
 
-    println!("{:?}", decoded_file);
+    println!("{}", decoded_file);
 
     Ok(())
 }

@@ -1,5 +1,6 @@
 pub mod bencode {
     use std::collections::HashMap;
+    use std::fmt;
     use thiserror::Error;
 
     #[derive(Debug, Error, PartialEq)]
@@ -22,6 +23,36 @@ pub mod bencode {
         String(Vec<u8>),
         List(Vec<Bencode>),
         Dictionary(HashMap<Vec<u8>, Bencode>),
+    }
+
+    impl fmt::Display for Bencode {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            match self {
+                Bencode::Integer(i) => write!(f, "{}", i),
+                Bencode::String(s) => write!(f, "\"{}\"", String::from_utf8_lossy(s)),
+                Bencode::List(list) => {
+                    write!(f, "[")?;
+                    for (i, item) in list.iter().enumerate() {
+                        if i > 0 {
+                            write!(f, ", ")?;
+                        }
+                        write!(f, "{}", item)?;
+                    }
+                    write!(f, "]")
+                }
+                Bencode::Dictionary(dict) => {
+                    write!(f, "{{")?;
+                    for (i, (key, value)) in dict.iter().enumerate() {
+                        if i > 0 {
+                            write!(f, ", ")?;
+                        }
+                        let key_str = String::from_utf8_lossy(key);
+                        write!(f, "\"{}\": {}", key_str, value)?;
+                    }
+                    write!(f, "}}")
+                }
+            }
+        }
     }
 
     pub fn decode(input: &[u8]) -> Result<(Bencode, &[u8]), BencodeError> {
