@@ -1,5 +1,5 @@
 pub mod bencode {
-    use std::collections::HashMap;
+    use std::collections::BTreeMap;
     use std::fmt;
     use thiserror::Error;
 
@@ -22,7 +22,7 @@ pub mod bencode {
         Integer(i64),
         String(Vec<u8>),
         List(Vec<Bencode>),
-        Dictionary(HashMap<Vec<u8>, Bencode>),
+        Dictionary(BTreeMap<Vec<u8>, Bencode>),
     }
 
     impl fmt::Display for Bencode {
@@ -110,7 +110,7 @@ pub mod bencode {
     }
 
     fn decode_dictionary(input: &[u8]) -> Result<(Bencode, &[u8]), BencodeError> {
-        let mut dictionary: HashMap<Vec<u8>, Bencode> = HashMap::new();
+        let mut dictionary: BTreeMap<Vec<u8>, Bencode> = BTreeMap::new();
         let mut remaining = &input[1..];
 
         while !remaining.is_empty() && remaining[0] != b'e' {
@@ -131,7 +131,7 @@ pub mod bencode {
 #[cfg(test)]
 mod tests {
     use crate::bencode::bencode::{decode, Bencode, BencodeError};
-    use std::collections::HashMap;
+    use std::collections::BTreeMap;
 
     #[test]
     fn it_returns_error_on_invalid_input() {
@@ -172,7 +172,7 @@ mod tests {
         let input = b"d4:wiki7:bencode7:meaningi42ee";
         let result = decode(input);
 
-        let mut expected_dict = HashMap::new();
+        let mut expected_dict = BTreeMap::new();
         expected_dict.insert(b"wiki".to_vec(), Bencode::String(b"bencode".to_vec()));
         expected_dict.insert(b"meaning".to_vec(), Bencode::Integer(42));
 
@@ -307,11 +307,11 @@ mod tests {
         let input = b"d3:foo3:bar3:bazd3:boo4:bump5:blasti42eee";
         let result = decode(input);
 
-        let mut inner_dict = HashMap::new();
+        let mut inner_dict = BTreeMap::new();
         inner_dict.insert(b"boo".to_vec(), Bencode::String(b"bump".to_vec()));
         inner_dict.insert(b"blast".to_vec(), Bencode::Integer(42));
 
-        let mut outer_dict = HashMap::new();
+        let mut outer_dict = BTreeMap::new();
         outer_dict.insert(b"foo".to_vec(), Bencode::String(b"bar".to_vec()));
         outer_dict.insert(b"baz".to_vec(), Bencode::Dictionary(inner_dict));
 
