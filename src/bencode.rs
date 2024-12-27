@@ -1,5 +1,20 @@
 pub mod bencode {
     use std::collections::HashMap;
+    use thiserror::Error;
+
+    #[derive(Debug, Error, PartialEq)]
+    pub enum BencodeError {
+        #[error("invalid input")]
+        InvalidInput,
+        #[error("invalid number")]
+        InvalidNumber,
+        #[error("invalid utf8 sequence")]
+        InvalidSequence,
+        #[error("no end marker found")]
+        NoEndMarker,
+        #[error("no string delimiter found")]
+        NoStringDelimiter,
+    }
 
     #[derive(Debug, PartialEq)]
     pub enum Bencode {
@@ -9,40 +24,40 @@ pub mod bencode {
         Dictionary(HashMap<Vec<u8>, Bencode>),
     }
 
-    pub fn decode(input: &[u8]) -> Result<(Bencode, &[u8]), String> {
+    pub fn decode(input: &[u8]) -> Result<(Bencode, &[u8]), BencodeError> {
         match input.first() {
             Some(b'i') => decode_integer(input),
             Some(b'0'..=b'9') => decode_string(input),
             Some(b'l') => decode_list(input),
             Some(b'd') => decode_dictionary(input),
-            _ => Err("invalid input".to_string()),
+            _ => Err(BencodeError::InvalidInput),
         }
     }
 
-    fn decode_integer(input: &[u8]) -> Result<(Bencode, &[u8]), String> {
+    fn decode_integer(input: &[u8]) -> Result<(Bencode, &[u8]), BencodeError> {
         let end_position = input
             .iter()
             .position(|&x| x == b'e')
-            .ok_or_else(|| "no end marker found")?;
+            .ok_or(BencodeError::NoEndMarker)?;
 
         let num = std::str::from_utf8(&input[1..end_position])
-            .map_err(|_| "invalid utf8 sequence".to_string())?
+            .map_err(|_| BencodeError::InvalidSequence)?
             .parse::<i64>()
-            .map_err(|_| "invalid number".to_string())?;
+            .map_err(|_| BencodeError::InvalidNumber)?;
 
         Ok((Bencode::Integer(num), &input[end_position + 1..]))
     }
 
-    fn decode_string(input: &[u8]) -> Result<(Bencode, &[u8]), String> {
+    fn decode_string(input: &[u8]) -> Result<(Bencode, &[u8]), BencodeError> {
         let end_position = input
             .iter()
             .position(|&x| x == b':')
-            .ok_or_else(|| "no string delimiter found")?;
+            .ok_or_else(|| BencodeError::NoStringDelimiter)?;
 
         let length = std::str::from_utf8(&input[..end_position])
-            .map_err(|_| "invalid utf8 sequence".to_string())?
+            .map_err(|_| BencodeError::InvalidSequence)?
             .parse::<usize>()
-            .map_err(|_| "invalid number".to_string())?;
+            .map_err(|_| BencodeError::InvalidNumber)?;
 
         let start = end_position + 1;
         let end = end_position + 1 + length;
@@ -50,7 +65,7 @@ pub mod bencode {
         Ok((Bencode::String(input[start..end].to_vec()), &input[end..]))
     }
 
-    fn decode_list(input: &[u8]) -> Result<(Bencode, &[u8]), String> {
+    fn decode_list(input: &[u8]) -> Result<(Bencode, &[u8]), BencodeError> {
         let mut list: Vec<Bencode> = Vec::new();
         let mut rest = &input[1..];
 
@@ -63,7 +78,7 @@ pub mod bencode {
         Ok((Bencode::List(list), &rest[1..]))
     }
 
-    fn decode_dictionary(input: &[u8]) -> Result<(Bencode, &[u8]), String> {
+    fn decode_dictionary(input: &[u8]) -> Result<(Bencode, &[u8]), BencodeError> {
         let mut dictionary: HashMap<Vec<u8>, Bencode> = HashMap::new();
         let mut remaining = &input[1..];
 
@@ -84,7 +99,7 @@ pub mod bencode {
 
 #[cfg(test)]
 mod tests {
-    use crate::bencode::bencode::{decode, Bencode};
+    use crate::bencode::bencode::{decode, Bencode, BencodeError};
     use std::collections::HashMap;
 
     #[test]
@@ -164,7 +179,7 @@ mod tests {
     fn it_handles_no_end_marker_for_integer() {
         let input = b"i123";
         let result = decode(input);
-        let expected = Err(String::from("no end marker found"));
+        let expected = Err(BencodeError::NoEndMarker);
 
         assert_eq!(result, expected);
     }
@@ -200,7 +215,7 @@ mod tests {
     fn it_handles_no_length_delimiter() {
         let input = b"7bencode";
         let result = decode(input);
-        let expected = Err(String::from("no string delimiter found"));
+        let expected = Err(BencodeError::NoStringDelimiter);
 
         assert_eq!(result, expected);
     }
