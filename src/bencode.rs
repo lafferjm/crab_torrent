@@ -32,8 +32,19 @@ pub mod bencode {
         pub creation_date: i64,
     }
 
+    fn get_integer(dictionary: &BTreeMap<Vec<u8>, Bencode>, key: &[u8]) -> Option<i64> {
+        dictionary.get(key).and_then(|value| value.as_integer())
+    }
+
+    fn get_string(dictionary: &BTreeMap<Vec<u8>, Bencode>, key: &[u8]) -> Option<String> {
+        dictionary
+            .get(key)
+            .and_then(|value| value.as_string())
+            .map(|value| value.to_string())
+    }
+
     impl Bencode {
-        fn as_i64(&self) -> Option<i64> {
+        fn as_integer(&self) -> Option<i64> {
             if let Bencode::Integer(i) = self {
                 Some(*i)
             } else {
@@ -59,14 +70,11 @@ pub mod bencode {
 
         pub fn to_torrent(&self) -> Option<Torrent> {
             let root = self.as_dict()?;
-            let announce = &b"announce".to_vec();
-            let announce = root.get(announce)?.as_string()?.to_string();
 
-            let created_by = &b"created by".to_vec();
-            let created_by = root.get(created_by)?.as_string()?.to_string();
+            let announce = get_string(root, b"announce")?;
+            let created_by = get_string(root, b"created by")?;
 
-            let creation_date = &b"creation date".to_vec();
-            let creation_date = root.get(creation_date)?.as_i64()?;
+            let creation_date = get_integer(root, b"creation date")?;
 
             Some(Torrent {
                 announce,
