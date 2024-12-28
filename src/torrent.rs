@@ -1,11 +1,12 @@
 use crate::bencode::Bencode;
+use chrono::{DateTime, Utc};
 use std::collections::BTreeMap;
 
 #[derive(Debug)]
 pub struct Torrent {
     pub announce: String,
     pub created_by: String,
-    pub creation_date: i64,
+    pub creation_date: DateTime<Utc>,
 }
 
 impl Torrent {
@@ -16,6 +17,7 @@ impl Torrent {
         let created_by = get_string(root, b"created by")?;
 
         let creation_date = get_integer(root, b"creation date")?;
+        let creation_date = DateTime::from_timestamp(creation_date, 0)?;
 
         Some(Torrent {
             announce,
