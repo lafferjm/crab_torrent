@@ -25,12 +25,23 @@ pub mod bencode {
         Dictionary(BTreeMap<Vec<u8>, Bencode>),
     }
 
+    #[derive(Debug)]
     pub struct Torrent {
         pub announce: String,
+        pub created_by: String,
+        pub creation_date: i64,
     }
 
     impl Bencode {
-        pub fn as_string(&self) -> Option<&str> {
+        fn as_i64(&self) -> Option<i64> {
+            if let Bencode::Integer(i) = self {
+                Some(*i)
+            } else {
+                None
+            }
+        }
+
+        fn as_string(&self) -> Option<&str> {
             if let Bencode::String(s) = self {
                 std::str::from_utf8(s).ok()
             } else {
@@ -38,14 +49,30 @@ pub mod bencode {
             }
         }
 
-        pub fn to_torrent(&self) -> Option<Torrent> {
-            if let Bencode::Dictionary(dictionary) = self {
-                let announce_key = &b"announce".to_vec();
-                let announce = dictionary.get(announce_key)?.as_string()?.to_string();
-                Some(Torrent { announce })
+        fn as_dict(&self) -> Option<&BTreeMap<Vec<u8>, Bencode>> {
+            if let Bencode::Dictionary(d) = self {
+                Some(d)
             } else {
                 None
             }
+        }
+
+        pub fn to_torrent(&self) -> Option<Torrent> {
+            let root = self.as_dict()?;
+            let announce = &b"announce".to_vec();
+            let announce = root.get(announce)?.as_string()?.to_string();
+
+            let created_by = &b"created by".to_vec();
+            let created_by = root.get(created_by)?.as_string()?.to_string();
+
+            let creation_date = &b"creation date".to_vec();
+            let creation_date = root.get(creation_date)?.as_i64()?;
+
+            Some(Torrent {
+                announce,
+                created_by,
+                creation_date,
+            })
         }
     }
 

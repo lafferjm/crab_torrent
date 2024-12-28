@@ -17,7 +17,7 @@ fn main() -> Result<(), String> {
         .to_torrent()
         .ok_or_else(|| "Could not decode torrent file".to_string())?;
 
-    println!("{}", decoded_file.announce);
+    println!("{:?}", decoded_file);
 
     Ok(())
 }
