@@ -24,26 +24,8 @@ pub enum Bencode {
     Dictionary(BTreeMap<Vec<u8>, Bencode>),
 }
 
-#[derive(Debug)]
-pub struct Torrent {
-    pub announce: String,
-    pub created_by: String,
-    pub creation_date: i64,
-}
-
-fn get_integer(dictionary: &BTreeMap<Vec<u8>, Bencode>, key: &[u8]) -> Option<i64> {
-    dictionary.get(key).and_then(|value| value.as_integer())
-}
-
-fn get_string(dictionary: &BTreeMap<Vec<u8>, Bencode>, key: &[u8]) -> Option<String> {
-    dictionary
-        .get(key)
-        .and_then(|value| value.as_string())
-        .map(|value| value.to_string())
-}
-
 impl Bencode {
-    fn as_integer(&self) -> Option<i64> {
+    pub fn as_integer(&self) -> Option<i64> {
         if let Bencode::Integer(i) = self {
             Some(*i)
         } else {
@@ -51,7 +33,7 @@ impl Bencode {
         }
     }
 
-    fn as_string(&self) -> Option<&str> {
+    pub fn as_string(&self) -> Option<&str> {
         if let Bencode::String(s) = self {
             std::str::from_utf8(s).ok()
         } else {
@@ -59,27 +41,12 @@ impl Bencode {
         }
     }
 
-    fn as_dict(&self) -> Option<&BTreeMap<Vec<u8>, Bencode>> {
+    pub fn as_dict(&self) -> Option<&BTreeMap<Vec<u8>, Bencode>> {
         if let Bencode::Dictionary(d) = self {
             Some(d)
         } else {
             None
         }
-    }
-
-    pub fn to_torrent(&self) -> Option<Torrent> {
-        let root = self.as_dict()?;
-
-        let announce = get_string(root, b"announce")?;
-        let created_by = get_string(root, b"created by")?;
-
-        let creation_date = get_integer(root, b"creation date")?;
-
-        Some(Torrent {
-            announce,
-            created_by,
-            creation_date,
-        })
     }
 }
 
