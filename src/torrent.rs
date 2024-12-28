@@ -14,6 +14,7 @@ pub enum TorrentError {
 #[derive(Debug, PartialEq)]
 pub struct TorrentInfo {
     pub name: String,
+    pub piece_length: i64,
 }
 
 #[derive(Debug, PartialEq)]
@@ -54,7 +55,10 @@ fn get_info(info_dictionary: &BTreeMap<Vec<u8>, Bencode>) -> Result<TorrentInfo,
     let name = get_string(info_dictionary, b"name")
         .ok_or(TorrentError::MissingField("name".to_string()))?;
 
-    Ok(TorrentInfo { name })
+    let piece_length = get_integer(info_dictionary, b"piece length")
+        .ok_or(TorrentError::MissingField("piece length".to_string()))?;
+
+    Ok(TorrentInfo { name, piece_length })
 }
 
 fn get_dictionary<'a>(
@@ -86,6 +90,7 @@ mod tests {
     fn it_converts_bencode_to_torrent() {
         let mut info_dictionary: BTreeMap<Vec<u8>, Bencode> = BTreeMap::new();
         info_dictionary.insert(b"name".to_vec(), Bencode::String(b"torrent name".to_vec()));
+        info_dictionary.insert(b"piece length".to_vec(), Bencode::Integer(123));
 
         let mut bencode_dictionary: BTreeMap<Vec<u8>, Bencode> = BTreeMap::new();
         bencode_dictionary.insert(
@@ -108,6 +113,7 @@ mod tests {
             creation_date: DateTime::from_timestamp(1735403744163, 0).unwrap(),
             info: TorrentInfo {
                 name: "torrent name".to_string(),
+                piece_length: 123,
             },
         };
 
@@ -192,6 +198,56 @@ mod tests {
 
         let result = Torrent::from_bencode(&bencode_dictionary);
         let expected = Err(TorrentError::MissingField("info".to_string()));
+
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn it_fails_if_info_missing_name() {
+        let mut info_dictionary: BTreeMap<Vec<u8>, Bencode> = BTreeMap::new();
+        info_dictionary.insert(b"piece length".to_vec(), Bencode::Integer(123));
+
+        let mut bencode_dictionary: BTreeMap<Vec<u8>, Bencode> = BTreeMap::new();
+        bencode_dictionary.insert(
+            b"announce".to_vec(),
+            Bencode::String(b"http://domain/announce".to_vec()),
+        );
+        bencode_dictionary.insert(
+            b"created by".to_vec(),
+            Bencode::String(b"created by me".to_vec()),
+        );
+        bencode_dictionary.insert(b"creation date".to_vec(), Bencode::Integer(1735403744163));
+        bencode_dictionary.insert(b"info".to_vec(), Bencode::Dictionary(info_dictionary));
+
+        let bencode_dictionary = Bencode::Dictionary(bencode_dictionary);
+
+        let result = Torrent::from_bencode(&bencode_dictionary);
+        let expected = Err(TorrentError::MissingField("name".to_string()));
+
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn it_fails_if_info_missing_piece_length() {
+        let mut info_dictionary: BTreeMap<Vec<u8>, Bencode> = BTreeMap::new();
+        info_dictionary.insert(b"name".to_vec(), Bencode::String(b"torrent name".to_vec()));
+
+        let mut bencode_dictionary: BTreeMap<Vec<u8>, Bencode> = BTreeMap::new();
+        bencode_dictionary.insert(
+            b"announce".to_vec(),
+            Bencode::String(b"http://domain/announce".to_vec()),
+        );
+        bencode_dictionary.insert(
+            b"created by".to_vec(),
+            Bencode::String(b"created by me".to_vec()),
+        );
+        bencode_dictionary.insert(b"creation date".to_vec(), Bencode::Integer(1735403744163));
+        bencode_dictionary.insert(b"info".to_vec(), Bencode::Dictionary(info_dictionary));
+
+        let bencode_dictionary = Bencode::Dictionary(bencode_dictionary);
+
+        let result = Torrent::from_bencode(&bencode_dictionary);
+        let expected = Err(TorrentError::MissingField("piece length".to_string()));
 
         assert_eq!(result, expected);
     }
