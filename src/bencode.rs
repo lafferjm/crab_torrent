@@ -48,6 +48,14 @@ impl Bencode {
             None
         }
     }
+
+    pub fn as_list(&self) -> Option<&Vec<Bencode>> {
+        if let Bencode::List(l) = self {
+            Some(l)
+        } else {
+            None
+        }
+    }
 }
 
 impl fmt::Display for Bencode {
