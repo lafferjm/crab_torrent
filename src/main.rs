@@ -1,6 +1,7 @@
 mod bencode;
+mod torrent;
 
-use bencode::bencode::{decode, Torrent};
+use bencode::{decode, Torrent};
 use std::env;
 use std::fs;
 

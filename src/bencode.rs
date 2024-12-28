@@ -1,195 +1,193 @@
-pub mod bencode {
-    use std::collections::BTreeMap;
-    use std::fmt;
-    use thiserror::Error;
+use std::collections::BTreeMap;
+use std::fmt;
+use thiserror::Error;
 
-    #[derive(Debug, Error, PartialEq)]
-    pub enum BencodeError {
-        #[error("invalid input")]
-        InvalidInput,
-        #[error("invalid number")]
-        InvalidNumber,
-        #[error("invalid utf8 sequence")]
-        InvalidSequence,
-        #[error("no end marker found")]
-        NoEndMarker,
-        #[error("no string delimiter found")]
-        NoStringDelimiter,
-    }
+#[derive(Debug, Error, PartialEq)]
+pub enum BencodeError {
+    #[error("invalid input")]
+    InvalidInput,
+    #[error("invalid number")]
+    InvalidNumber,
+    #[error("invalid utf8 sequence")]
+    InvalidSequence,
+    #[error("no end marker found")]
+    NoEndMarker,
+    #[error("no string delimiter found")]
+    NoStringDelimiter,
+}
 
-    #[derive(Debug, PartialEq)]
-    pub enum Bencode {
-        Integer(i64),
-        String(Vec<u8>),
-        List(Vec<Bencode>),
-        Dictionary(BTreeMap<Vec<u8>, Bencode>),
-    }
+#[derive(Debug, PartialEq)]
+pub enum Bencode {
+    Integer(i64),
+    String(Vec<u8>),
+    List(Vec<Bencode>),
+    Dictionary(BTreeMap<Vec<u8>, Bencode>),
+}
 
-    #[derive(Debug)]
-    pub struct Torrent {
-        pub announce: String,
-        pub created_by: String,
-        pub creation_date: i64,
-    }
+#[derive(Debug)]
+pub struct Torrent {
+    pub announce: String,
+    pub created_by: String,
+    pub creation_date: i64,
+}
 
-    fn get_integer(dictionary: &BTreeMap<Vec<u8>, Bencode>, key: &[u8]) -> Option<i64> {
-        dictionary.get(key).and_then(|value| value.as_integer())
-    }
+fn get_integer(dictionary: &BTreeMap<Vec<u8>, Bencode>, key: &[u8]) -> Option<i64> {
+    dictionary.get(key).and_then(|value| value.as_integer())
+}
 
-    fn get_string(dictionary: &BTreeMap<Vec<u8>, Bencode>, key: &[u8]) -> Option<String> {
-        dictionary
-            .get(key)
-            .and_then(|value| value.as_string())
-            .map(|value| value.to_string())
-    }
+fn get_string(dictionary: &BTreeMap<Vec<u8>, Bencode>, key: &[u8]) -> Option<String> {
+    dictionary
+        .get(key)
+        .and_then(|value| value.as_string())
+        .map(|value| value.to_string())
+}
 
-    impl Bencode {
-        fn as_integer(&self) -> Option<i64> {
-            if let Bencode::Integer(i) = self {
-                Some(*i)
-            } else {
-                None
-            }
-        }
-
-        fn as_string(&self) -> Option<&str> {
-            if let Bencode::String(s) = self {
-                std::str::from_utf8(s).ok()
-            } else {
-                None
-            }
-        }
-
-        fn as_dict(&self) -> Option<&BTreeMap<Vec<u8>, Bencode>> {
-            if let Bencode::Dictionary(d) = self {
-                Some(d)
-            } else {
-                None
-            }
-        }
-
-        pub fn to_torrent(&self) -> Option<Torrent> {
-            let root = self.as_dict()?;
-
-            let announce = get_string(root, b"announce")?;
-            let created_by = get_string(root, b"created by")?;
-
-            let creation_date = get_integer(root, b"creation date")?;
-
-            Some(Torrent {
-                announce,
-                created_by,
-                creation_date,
-            })
+impl Bencode {
+    fn as_integer(&self) -> Option<i64> {
+        if let Bencode::Integer(i) = self {
+            Some(*i)
+        } else {
+            None
         }
     }
 
-    impl fmt::Display for Bencode {
-        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            match self {
-                Bencode::Integer(i) => write!(f, "{}", i),
-                Bencode::String(s) => write!(f, "\"{}\"", String::from_utf8_lossy(s)),
-                Bencode::List(list) => {
-                    write!(f, "[")?;
-                    for (i, item) in list.iter().enumerate() {
-                        if i > 0 {
-                            write!(f, ", ")?;
-                        }
-                        write!(f, "{}", item)?;
+    fn as_string(&self) -> Option<&str> {
+        if let Bencode::String(s) = self {
+            std::str::from_utf8(s).ok()
+        } else {
+            None
+        }
+    }
+
+    fn as_dict(&self) -> Option<&BTreeMap<Vec<u8>, Bencode>> {
+        if let Bencode::Dictionary(d) = self {
+            Some(d)
+        } else {
+            None
+        }
+    }
+
+    pub fn to_torrent(&self) -> Option<Torrent> {
+        let root = self.as_dict()?;
+
+        let announce = get_string(root, b"announce")?;
+        let created_by = get_string(root, b"created by")?;
+
+        let creation_date = get_integer(root, b"creation date")?;
+
+        Some(Torrent {
+            announce,
+            created_by,
+            creation_date,
+        })
+    }
+}
+
+impl fmt::Display for Bencode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Bencode::Integer(i) => write!(f, "{}", i),
+            Bencode::String(s) => write!(f, "\"{}\"", String::from_utf8_lossy(s)),
+            Bencode::List(list) => {
+                write!(f, "[")?;
+                for (i, item) in list.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
                     }
-                    write!(f, "]")
+                    write!(f, "{}", item)?;
                 }
-                Bencode::Dictionary(dict) => {
-                    write!(f, "{{")?;
-                    for (i, (key, value)) in dict.iter().enumerate() {
-                        if i > 0 {
-                            write!(f, ", ")?;
-                        }
-                        let key_str = String::from_utf8_lossy(key);
-                        write!(f, "\"{}\": {}", key_str, value)?;
+                write!(f, "]")
+            }
+            Bencode::Dictionary(dict) => {
+                write!(f, "{{")?;
+                for (i, (key, value)) in dict.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
                     }
-                    write!(f, "}}")
+                    let key_str = String::from_utf8_lossy(key);
+                    write!(f, "\"{}\": {}", key_str, value)?;
                 }
+                write!(f, "}}")
             }
         }
     }
+}
 
-    pub fn decode(input: &[u8]) -> Result<(Bencode, &[u8]), BencodeError> {
-        match input.first() {
-            Some(b'i') => decode_integer(input),
-            Some(b'0'..=b'9') => decode_string(input),
-            Some(b'l') => decode_list(input),
-            Some(b'd') => decode_dictionary(input),
-            _ => Err(BencodeError::InvalidInput),
-        }
+pub fn decode(input: &[u8]) -> Result<(Bencode, &[u8]), BencodeError> {
+    match input.first() {
+        Some(b'i') => decode_integer(input),
+        Some(b'0'..=b'9') => decode_string(input),
+        Some(b'l') => decode_list(input),
+        Some(b'd') => decode_dictionary(input),
+        _ => Err(BencodeError::InvalidInput),
+    }
+}
+
+fn decode_integer(input: &[u8]) -> Result<(Bencode, &[u8]), BencodeError> {
+    let end_position = input
+        .iter()
+        .position(|&x| x == b'e')
+        .ok_or(BencodeError::NoEndMarker)?;
+
+    let num = std::str::from_utf8(&input[1..end_position])
+        .map_err(|_| BencodeError::InvalidSequence)?
+        .parse::<i64>()
+        .map_err(|_| BencodeError::InvalidNumber)?;
+
+    Ok((Bencode::Integer(num), &input[end_position + 1..]))
+}
+
+fn decode_string(input: &[u8]) -> Result<(Bencode, &[u8]), BencodeError> {
+    let end_position = input
+        .iter()
+        .position(|&x| x == b':')
+        .ok_or_else(|| BencodeError::NoStringDelimiter)?;
+
+    let length = std::str::from_utf8(&input[..end_position])
+        .map_err(|_| BencodeError::InvalidSequence)?
+        .parse::<usize>()
+        .map_err(|_| BencodeError::InvalidNumber)?;
+
+    let start = end_position + 1;
+    let end = end_position + 1 + length;
+
+    Ok((Bencode::String(input[start..end].to_vec()), &input[end..]))
+}
+
+fn decode_list(input: &[u8]) -> Result<(Bencode, &[u8]), BencodeError> {
+    let mut list: Vec<Bencode> = Vec::new();
+    let mut rest = &input[1..];
+
+    while !rest.is_empty() && rest[0] != b'e' {
+        let (value, rest_input) = decode(rest)?;
+        list.push(value);
+        rest = rest_input;
     }
 
-    fn decode_integer(input: &[u8]) -> Result<(Bencode, &[u8]), BencodeError> {
-        let end_position = input
-            .iter()
-            .position(|&x| x == b'e')
-            .ok_or(BencodeError::NoEndMarker)?;
+    Ok((Bencode::List(list), &rest[1..]))
+}
 
-        let num = std::str::from_utf8(&input[1..end_position])
-            .map_err(|_| BencodeError::InvalidSequence)?
-            .parse::<i64>()
-            .map_err(|_| BencodeError::InvalidNumber)?;
+fn decode_dictionary(input: &[u8]) -> Result<(Bencode, &[u8]), BencodeError> {
+    let mut dictionary: BTreeMap<Vec<u8>, Bencode> = BTreeMap::new();
+    let mut remaining = &input[1..];
 
-        Ok((Bencode::Integer(num), &input[end_position + 1..]))
-    }
+    while !remaining.is_empty() && remaining[0] != b'e' {
+        let (key, rest) = decode_string(remaining)?;
+        let (value, rest) = decode(rest)?;
 
-    fn decode_string(input: &[u8]) -> Result<(Bencode, &[u8]), BencodeError> {
-        let end_position = input
-            .iter()
-            .position(|&x| x == b':')
-            .ok_or_else(|| BencodeError::NoStringDelimiter)?;
-
-        let length = std::str::from_utf8(&input[..end_position])
-            .map_err(|_| BencodeError::InvalidSequence)?
-            .parse::<usize>()
-            .map_err(|_| BencodeError::InvalidNumber)?;
-
-        let start = end_position + 1;
-        let end = end_position + 1 + length;
-
-        Ok((Bencode::String(input[start..end].to_vec()), &input[end..]))
-    }
-
-    fn decode_list(input: &[u8]) -> Result<(Bencode, &[u8]), BencodeError> {
-        let mut list: Vec<Bencode> = Vec::new();
-        let mut rest = &input[1..];
-
-        while !rest.is_empty() && rest[0] != b'e' {
-            let (value, rest_input) = decode(rest)?;
-            list.push(value);
-            rest = rest_input;
-        }
-
-        Ok((Bencode::List(list), &rest[1..]))
-    }
-
-    fn decode_dictionary(input: &[u8]) -> Result<(Bencode, &[u8]), BencodeError> {
-        let mut dictionary: BTreeMap<Vec<u8>, Bencode> = BTreeMap::new();
-        let mut remaining = &input[1..];
-
-        while !remaining.is_empty() && remaining[0] != b'e' {
-            let (key, rest) = decode_string(remaining)?;
-            let (value, rest) = decode(rest)?;
-
-            if let Bencode::String(key_value) = key {
-                dictionary.insert(key_value, value);
-            }
-
-            remaining = rest;
+        if let Bencode::String(key_value) = key {
+            dictionary.insert(key_value, value);
         }
 
-        Ok((Bencode::Dictionary(dictionary), &remaining[1..]))
+        remaining = rest;
     }
+
+    Ok((Bencode::Dictionary(dictionary), &remaining[1..]))
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::bencode::bencode::{decode, Bencode, BencodeError};
+    use super::{decode, Bencode, BencodeError};
     use std::collections::BTreeMap;
 
     #[test]
