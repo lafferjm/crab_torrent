@@ -12,10 +12,16 @@ pub enum TorrentError {
 }
 
 #[derive(Debug, PartialEq)]
+pub struct TorrentInfo {
+    pub name: String,
+}
+
+#[derive(Debug, PartialEq)]
 pub struct Torrent {
     pub announce: String,
     pub created_by: String,
     pub creation_date: DateTime<Utc>,
+    pub info: TorrentInfo,
 }
 
 impl Torrent {
@@ -31,12 +37,31 @@ impl Torrent {
             .and_then(|epoch| DateTime::from_timestamp(epoch, 0))
             .ok_or(TorrentError::MissingField("creation date".to_string()))?;
 
+        let info =
+            get_dictionary(root, b"info").ok_or(TorrentError::MissingField("info".to_string()))?;
+        let info = get_info(info)?;
+
         Ok(Torrent {
             announce,
             created_by,
             creation_date,
+            info,
         })
     }
+}
+
+fn get_info(info_dictionary: &BTreeMap<Vec<u8>, Bencode>) -> Result<TorrentInfo, TorrentError> {
+    let name = get_string(info_dictionary, b"name")
+        .ok_or(TorrentError::MissingField("name".to_string()))?;
+
+    Ok(TorrentInfo { name })
+}
+
+fn get_dictionary<'a>(
+    dictionary: &'a BTreeMap<Vec<u8>, Bencode>,
+    key: &'a [u8],
+) -> Option<&'a BTreeMap<Vec<u8>, Bencode>> {
+    dictionary.get(key).and_then(|value| value.as_dict())
 }
 
 fn get_integer(dictionary: &BTreeMap<Vec<u8>, Bencode>, key: &[u8]) -> Option<i64> {
@@ -52,13 +77,16 @@ fn get_string(dictionary: &BTreeMap<Vec<u8>, Bencode>, key: &[u8]) -> Option<Str
 
 #[cfg(test)]
 mod tests {
-    use super::{Torrent, TorrentError};
+    use super::{Torrent, TorrentError, TorrentInfo};
     use crate::bencode::Bencode;
     use chrono::DateTime;
     use std::collections::BTreeMap;
 
     #[test]
     fn it_converts_bencode_to_torrent() {
+        let mut info_dictionary: BTreeMap<Vec<u8>, Bencode> = BTreeMap::new();
+        info_dictionary.insert(b"name".to_vec(), Bencode::String(b"torrent name".to_vec()));
+
         let mut bencode_dictionary: BTreeMap<Vec<u8>, Bencode> = BTreeMap::new();
         bencode_dictionary.insert(
             b"announce".to_vec(),
@@ -69,6 +97,8 @@ mod tests {
             Bencode::String(b"created by me".to_vec()),
         );
         bencode_dictionary.insert(b"creation date".to_vec(), Bencode::Integer(1735403744163));
+        bencode_dictionary.insert(b"info".to_vec(), Bencode::Dictionary(info_dictionary));
+
         let bencode_dictionary = Bencode::Dictionary(bencode_dictionary);
 
         let result = Torrent::from_bencode(&bencode_dictionary).unwrap();
@@ -76,6 +106,9 @@ mod tests {
             announce: "http://domain/announce".to_string(),
             created_by: "created by me".to_string(),
             creation_date: DateTime::from_timestamp(1735403744163, 0).unwrap(),
+            info: TorrentInfo {
+                name: "torrent name".to_string(),
+            },
         };
 
         assert_eq!(result, expected);
@@ -138,6 +171,27 @@ mod tests {
 
         let result = Torrent::from_bencode(&bencode_dictionary);
         let expected = Err(TorrentError::MissingField("creation date".to_string()));
+
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn it_fails_if_info_missing() {
+        let mut bencode_dictionary: BTreeMap<Vec<u8>, Bencode> = BTreeMap::new();
+        bencode_dictionary.insert(
+            b"announce".to_vec(),
+            Bencode::String(b"http://domain/announce".to_vec()),
+        );
+        bencode_dictionary.insert(
+            b"created by".to_vec(),
+            Bencode::String(b"created by me".to_vec()),
+        );
+        bencode_dictionary.insert(b"creation date".to_vec(), Bencode::Integer(1735403744163));
+
+        let bencode_dictionary = Bencode::Dictionary(bencode_dictionary);
+
+        let result = Torrent::from_bencode(&bencode_dictionary);
+        let expected = Err(TorrentError::MissingField("info".to_string()));
 
         assert_eq!(result, expected);
     }
