@@ -25,6 +25,30 @@ pub mod bencode {
         Dictionary(BTreeMap<Vec<u8>, Bencode>),
     }
 
+    pub struct Torrent {
+        pub announce: String,
+    }
+
+    impl Bencode {
+        pub fn as_string(&self) -> Option<&str> {
+            if let Bencode::String(s) = self {
+                std::str::from_utf8(s).ok()
+            } else {
+                None
+            }
+        }
+
+        pub fn to_torrent(&self) -> Option<Torrent> {
+            if let Bencode::Dictionary(dictionary) = self {
+                let announce_key = &b"announce".to_vec();
+                let announce = dictionary.get(announce_key)?.as_string()?.to_string();
+                Some(Torrent { announce })
+            } else {
+                None
+            }
+        }
+    }
+
     impl fmt::Display for Bencode {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             match self {
