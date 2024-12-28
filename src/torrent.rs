@@ -16,8 +16,8 @@ impl Torrent {
         let announce = get_string(root, b"announce")?;
         let created_by = get_string(root, b"created by")?;
 
-        let creation_date = get_integer(root, b"creation date")?;
-        let creation_date = DateTime::from_timestamp(creation_date, 0)?;
+        let creation_date = get_integer(root, b"creation date")
+            .and_then(|epoch| DateTime::from_timestamp(epoch, 0))?;
 
         Some(Torrent {
             announce,
