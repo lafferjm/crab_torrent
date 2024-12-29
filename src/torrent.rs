@@ -26,6 +26,7 @@ pub struct TorrentInfo {
     pub name: String,
     pub piece_length: i64,
     pub files: Vec<TorrentFile>,
+    pub pieces: String,
 }
 
 #[derive(Debug, PartialEq)]
@@ -98,10 +99,17 @@ fn get_info(info_dictionary: &BTreeMap<Vec<u8>, Bencode>) -> Result<TorrentInfo,
         .ok_or(TorrentError::MissingField("files".to_string()))
         .and_then(|files| get_files(files))?;
 
+    let pieces = get_bytes(info_dictionary, b"pieces")
+        .ok_or(TorrentError::MissingField("pieces".to_string()))?
+        .into_iter()
+        .map(|b| format!("{:02X}", b))
+        .collect();
+
     Ok(TorrentInfo {
         name,
         piece_length,
         files,
+        pieces,
     })
 }
 
@@ -130,6 +138,15 @@ fn get_string(dictionary: &BTreeMap<Vec<u8>, Bencode>, key: &[u8]) -> Option<Str
         .map(|value| value.to_string())
 }
 
+fn get_bytes(dictionary: &BTreeMap<Vec<u8>, Bencode>, key: &[u8]) -> Option<Vec<u8>> {
+    Some(
+        dictionary
+            .get(key)
+            .and_then(|value| value.as_bytes())?
+            .to_vec(),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::{get_files, get_info, Torrent, TorrentError, TorrentFile, TorrentInfo};
@@ -153,6 +170,7 @@ mod tests {
             b"files".to_vec(),
             Bencode::List(vec![Bencode::Dictionary(file_info_dict)]),
         );
+        info_dictionary.insert(b"pieces".to_vec(), Bencode::String(b"bytes".to_vec()));
 
         let mut bencode_dictionary: BTreeMap<Vec<u8>, Bencode> = BTreeMap::new();
         bencode_dictionary.insert(
@@ -180,6 +198,7 @@ mod tests {
                     length: 1234,
                     path: vec!["/some/path".to_string()],
                 }],
+                pieces: "6279746573".to_string(),
             },
         };
 
@@ -273,6 +292,7 @@ mod tests {
         let mut info_dictionary: BTreeMap<Vec<u8>, Bencode> = BTreeMap::new();
         info_dictionary.insert(b"piece length".to_vec(), Bencode::Integer(123));
         info_dictionary.insert(b"files".to_vec(), Bencode::List(Vec::new()));
+        info_dictionary.insert(b"pieces".to_vec(), Bencode::List(Vec::new()));
 
         let result = get_info(&info_dictionary);
         let expected = Err(TorrentError::MissingField("name".to_string()));
@@ -285,6 +305,7 @@ mod tests {
         let mut info_dictionary: BTreeMap<Vec<u8>, Bencode> = BTreeMap::new();
         info_dictionary.insert(b"name".to_vec(), Bencode::String(b"torrent name".to_vec()));
         info_dictionary.insert(b"files".to_vec(), Bencode::List(Vec::new()));
+        info_dictionary.insert(b"pieces".to_vec(), Bencode::List(Vec::new()));
 
         let result = get_info(&info_dictionary);
         let expected = Err(TorrentError::MissingField("piece length".to_string()));
@@ -297,9 +318,23 @@ mod tests {
         let mut info_dictionary: BTreeMap<Vec<u8>, Bencode> = BTreeMap::new();
         info_dictionary.insert(b"name".to_vec(), Bencode::String(b"torrent name".to_vec()));
         info_dictionary.insert(b"piece length".to_vec(), Bencode::Integer(123));
+        info_dictionary.insert(b"pieces".to_vec(), Bencode::List(Vec::new()));
 
         let result = get_info(&info_dictionary);
         let expected = Err(TorrentError::MissingField("files".to_string()));
+
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn it_fails_if_pieces_missing() {
+        let mut info_dictionary: BTreeMap<Vec<u8>, Bencode> = BTreeMap::new();
+        info_dictionary.insert(b"name".to_vec(), Bencode::String(b"torrent name".to_vec()));
+        info_dictionary.insert(b"piece length".to_vec(), Bencode::Integer(123));
+        info_dictionary.insert(b"files".to_vec(), Bencode::List(Vec::new()));
+
+        let result = get_info(&info_dictionary);
+        let expected = Err(TorrentError::MissingField("pieces".to_string()));
 
         assert_eq!(result, expected);
     }

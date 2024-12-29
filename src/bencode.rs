@@ -56,6 +56,14 @@ impl Bencode {
             None
         }
     }
+
+    pub fn as_bytes(&self) -> Option<&[u8]> {
+        if let Bencode::String(s) = self {
+            Some(s)
+        } else {
+            None
+        }
+    }
 }
 
 impl fmt::Display for Bencode {
