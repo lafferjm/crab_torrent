@@ -119,16 +119,23 @@ fn get_string(dictionary: &BTreeMap<Vec<u8>, Bencode>, key: &[u8]) -> Option<Str
 
 #[cfg(test)]
 mod tests {
-    use super::{Torrent, TorrentError, TorrentInfo};
+    use super::{Torrent, TorrentError, TorrentFile, TorrentInfo};
     use crate::bencode::Bencode;
     use chrono::DateTime;
     use std::collections::BTreeMap;
 
     #[test]
     fn it_converts_bencode_to_torrent() {
+        let mut file_info_dict: BTreeMap<Vec<u8>, Bencode> = BTreeMap::new();
+        file_info_dict.insert(b"length".to_vec(), Bencode::Integer(1234));
+
         let mut info_dictionary: BTreeMap<Vec<u8>, Bencode> = BTreeMap::new();
         info_dictionary.insert(b"name".to_vec(), Bencode::String(b"torrent name".to_vec()));
         info_dictionary.insert(b"piece length".to_vec(), Bencode::Integer(123));
+        info_dictionary.insert(
+            b"files".to_vec(),
+            Bencode::List(vec![Bencode::Dictionary(file_info_dict)]),
+        );
 
         let mut bencode_dictionary: BTreeMap<Vec<u8>, Bencode> = BTreeMap::new();
         bencode_dictionary.insert(
@@ -152,6 +159,7 @@ mod tests {
             info: TorrentInfo {
                 name: "torrent name".to_string(),
                 piece_length: 123,
+                files: vec![TorrentFile { length: 1234 }],
             },
         };
 
