@@ -42,16 +42,16 @@ impl Torrent {
         let root = bencode.as_dict().ok_or(TorrentError::InvalidTorrentFile)?;
 
         let announce = get_string(root, b"announce")
-            .ok_or(TorrentError::MissingField("announce".to_string()))?;
+            .ok_or(TorrentError::MissingField(String::from("announce")))?;
         let created_by = get_string(root, b"created by")
-            .ok_or(TorrentError::MissingField("created by".to_string()))?;
+            .ok_or(TorrentError::MissingField(String::from("created by")))?;
 
         let creation_date = get_integer(root, b"creation date")
             .and_then(|epoch| DateTime::from_timestamp(epoch, 0))
-            .ok_or(TorrentError::MissingField("creation date".to_string()))?;
+            .ok_or(TorrentError::MissingField(String::from("creation date")))?;
 
-        let info =
-            get_dictionary(root, b"info").ok_or(TorrentError::MissingField("info".to_string()))?;
+        let info = get_dictionary(root, b"info")
+            .ok_or(TorrentError::MissingField(String::from("info")))?;
         let info = get_info(info)?;
 
         Ok(Torrent {
@@ -70,10 +70,10 @@ fn get_files(file_list: &Vec<Bencode>) -> Result<Vec<TorrentFile>, TorrentError>
             let file_dictionary = file.as_dict().ok_or(TorrentError::InvalidDictionary)?;
 
             let length = get_integer(file_dictionary, b"length")
-                .ok_or(TorrentError::MissingField("length".to_string()))?;
+                .ok_or(TorrentError::MissingField(String::from("length")))?;
 
             let path = get_list(file_dictionary, b"path")
-                .ok_or(TorrentError::MissingField("path".to_string()))?
+                .ok_or(TorrentError::MissingField(String::from("path")))?
                 .iter()
                 .map(|value| {
                     value
@@ -90,17 +90,17 @@ fn get_files(file_list: &Vec<Bencode>) -> Result<Vec<TorrentFile>, TorrentError>
 
 fn get_info(info_dictionary: &BTreeMap<Vec<u8>, Bencode>) -> Result<TorrentInfo, TorrentError> {
     let name = get_string(info_dictionary, b"name")
-        .ok_or(TorrentError::MissingField("name".to_string()))?;
+        .ok_or(TorrentError::MissingField(String::from("name")))?;
 
     let piece_length = get_integer(info_dictionary, b"piece length")
-        .ok_or(TorrentError::MissingField("piece length".to_string()))?;
+        .ok_or(TorrentError::MissingField(String::from("piece length")))?;
 
     let files = get_list(info_dictionary, b"files")
-        .ok_or(TorrentError::MissingField("files".to_string()))
+        .ok_or(TorrentError::MissingField(String::from("files")))
         .and_then(|files| get_files(files))?;
 
     let pieces = get_bytes(info_dictionary, b"pieces")
-        .ok_or(TorrentError::MissingField("pieces".to_string()))?
+        .ok_or(TorrentError::MissingField(String::from("pieces")))?
         .into_iter()
         .map(|b| format!("{:02X}", b))
         .collect();
@@ -135,7 +135,7 @@ fn get_string(dictionary: &BTreeMap<Vec<u8>, Bencode>, key: &[u8]) -> Option<Str
     dictionary
         .get(key)
         .and_then(|value| value.as_string())
-        .map(|value| value.to_string())
+        .map(String::from)
 }
 
 fn get_bytes(dictionary: &BTreeMap<Vec<u8>, Bencode>, key: &[u8]) -> Option<Vec<u8>> {
@@ -188,17 +188,17 @@ mod tests {
 
         let result = Torrent::from_bencode(&bencode_dictionary).unwrap();
         let expected = Torrent {
-            announce: "http://domain/announce".to_string(),
-            created_by: "created by me".to_string(),
+            announce: String::from("http://domain/announce"),
+            created_by: String::from("created by me"),
             creation_date: DateTime::from_timestamp(1735403744163, 0).unwrap(),
             info: TorrentInfo {
-                name: "torrent name".to_string(),
+                name: String::from("torrent name"),
                 piece_length: 123,
                 files: vec![TorrentFile {
                     length: 1234,
-                    path: vec!["/some/path".to_string()],
+                    path: vec![String::from("/some/path")],
                 }],
-                pieces: "6279746573".to_string(),
+                pieces: String::from("6279746573"),
             },
         };
 
@@ -226,7 +226,7 @@ mod tests {
         let bencode_dictionary = Bencode::Dictionary(bencode_dictionary);
 
         let result = Torrent::from_bencode(&bencode_dictionary);
-        let expected = Err(TorrentError::MissingField("announce".to_string()));
+        let expected = Err(TorrentError::MissingField(String::from("announce")));
 
         assert_eq!(result, expected);
     }
@@ -242,7 +242,7 @@ mod tests {
         let bencode_dictionary = Bencode::Dictionary(bencode_dictionary);
 
         let result = Torrent::from_bencode(&bencode_dictionary);
-        let expected = Err(TorrentError::MissingField("created by".to_string()));
+        let expected = Err(TorrentError::MissingField(String::from("created by")));
 
         assert_eq!(result, expected);
     }
@@ -261,7 +261,7 @@ mod tests {
         let bencode_dictionary = Bencode::Dictionary(bencode_dictionary);
 
         let result = Torrent::from_bencode(&bencode_dictionary);
-        let expected = Err(TorrentError::MissingField("creation date".to_string()));
+        let expected = Err(TorrentError::MissingField(String::from("creation date")));
 
         assert_eq!(result, expected);
     }
@@ -282,7 +282,7 @@ mod tests {
         let bencode_dictionary = Bencode::Dictionary(bencode_dictionary);
 
         let result = Torrent::from_bencode(&bencode_dictionary);
-        let expected = Err(TorrentError::MissingField("info".to_string()));
+        let expected = Err(TorrentError::MissingField(String::from("info")));
 
         assert_eq!(result, expected);
     }
@@ -295,7 +295,7 @@ mod tests {
         info_dictionary.insert(b"pieces".to_vec(), Bencode::List(Vec::new()));
 
         let result = get_info(&info_dictionary);
-        let expected = Err(TorrentError::MissingField("name".to_string()));
+        let expected = Err(TorrentError::MissingField(String::from("name")));
 
         assert_eq!(result, expected);
     }
@@ -308,7 +308,7 @@ mod tests {
         info_dictionary.insert(b"pieces".to_vec(), Bencode::List(Vec::new()));
 
         let result = get_info(&info_dictionary);
-        let expected = Err(TorrentError::MissingField("piece length".to_string()));
+        let expected = Err(TorrentError::MissingField(String::from("piece length")));
 
         assert_eq!(result, expected);
     }
@@ -321,7 +321,7 @@ mod tests {
         info_dictionary.insert(b"pieces".to_vec(), Bencode::List(Vec::new()));
 
         let result = get_info(&info_dictionary);
-        let expected = Err(TorrentError::MissingField("files".to_string()));
+        let expected = Err(TorrentError::MissingField(String::from("files")));
 
         assert_eq!(result, expected);
     }
@@ -334,7 +334,7 @@ mod tests {
         info_dictionary.insert(b"files".to_vec(), Bencode::List(Vec::new()));
 
         let result = get_info(&info_dictionary);
-        let expected = Err(TorrentError::MissingField("pieces".to_string()));
+        let expected = Err(TorrentError::MissingField(String::from("pieces")));
 
         assert_eq!(result, expected);
     }
@@ -376,7 +376,7 @@ mod tests {
         );
 
         let result = get_files(&vec![Bencode::Dictionary(file_dictionary)]);
-        let expected = Err(TorrentError::MissingField("length".to_string()));
+        let expected = Err(TorrentError::MissingField(String::from("length")));
 
         assert_eq!(result, expected);
     }
@@ -387,7 +387,7 @@ mod tests {
         file_dictionary.insert(b"length".to_vec(), Bencode::Integer(123));
 
         let result = get_files(&vec![Bencode::Dictionary(file_dictionary)]);
-        let expected = Err(TorrentError::MissingField("path".to_string()));
+        let expected = Err(TorrentError::MissingField(String::from("path")));
 
         assert_eq!(result, expected);
     }
