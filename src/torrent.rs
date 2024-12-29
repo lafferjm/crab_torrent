@@ -7,6 +7,10 @@ use thiserror::Error;
 pub enum TorrentError {
     #[error("invalid dictionary=")]
     InvalidDictionary,
+    #[error("invalid list")]
+    InvalidList,
+    #[error("invalid string")]
+    InvalidString,
     #[error("invalid torrent file")]
     InvalidTorrentFile,
     #[error("missing field `{0}`")]
@@ -16,7 +20,7 @@ pub enum TorrentError {
 #[derive(Debug, PartialEq)]
 pub struct TorrentFile {
     pub length: i64,
-    // pub path: Vec<String>,
+    pub path: Vec<String>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -69,7 +73,18 @@ fn get_files(file_list: &Vec<Bencode>) -> Result<Vec<TorrentFile>, TorrentError>
             let length = get_integer(file_dictionary, b"length")
                 .ok_or(TorrentError::MissingField("length".to_string()))?;
 
-            Ok(TorrentFile { length })
+            let path = get_list(file_dictionary, b"path")
+                .ok_or(TorrentError::MissingField("path".to_string()))?
+                .iter()
+                .map(|value| {
+                    value
+                        .as_string()
+                        .map(String::from)
+                        .ok_or(TorrentError::InvalidString)
+                })
+                .collect::<Result<Vec<String>, TorrentError>>()?;
+
+            Ok(TorrentFile { length, path })
         })
         .collect()
 }
