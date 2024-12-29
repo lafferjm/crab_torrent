@@ -5,6 +5,8 @@ use thiserror::Error;
 
 #[derive(Debug, Error, PartialEq)]
 pub enum TorrentError {
+    #[error("invalid dictionary=")]
+    InvalidDictionary,
     #[error("invalid torrent file")]
     InvalidTorrentFile,
     #[error("missing field `{0}`")]
@@ -12,9 +14,16 @@ pub enum TorrentError {
 }
 
 #[derive(Debug, PartialEq)]
+pub struct TorrentFile {
+    pub length: i64,
+    // pub path: Vec<String>,
+}
+
+#[derive(Debug, PartialEq)]
 pub struct TorrentInfo {
     pub name: String,
     pub piece_length: i64,
+    pub files: Vec<TorrentFile>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -51,6 +60,20 @@ impl Torrent {
     }
 }
 
+fn get_files(file_list: &Vec<Bencode>) -> Result<Vec<TorrentFile>, TorrentError> {
+    file_list
+        .into_iter()
+        .map(|file| {
+            let file_dictionary = file.as_dict().ok_or(TorrentError::InvalidDictionary)?;
+
+            let length = get_integer(file_dictionary, b"length")
+                .ok_or(TorrentError::MissingField("length".to_string()))?;
+
+            Ok(TorrentFile { length })
+        })
+        .collect()
+}
+
 fn get_info(info_dictionary: &BTreeMap<Vec<u8>, Bencode>) -> Result<TorrentInfo, TorrentError> {
     let name = get_string(info_dictionary, b"name")
         .ok_or(TorrentError::MissingField("name".to_string()))?;
@@ -58,7 +81,15 @@ fn get_info(info_dictionary: &BTreeMap<Vec<u8>, Bencode>) -> Result<TorrentInfo,
     let piece_length = get_integer(info_dictionary, b"piece length")
         .ok_or(TorrentError::MissingField("piece length".to_string()))?;
 
-    Ok(TorrentInfo { name, piece_length })
+    let files = get_list(info_dictionary, b"files")
+        .ok_or(TorrentError::MissingField("files".to_string()))
+        .and_then(|files| get_files(files))?;
+
+    Ok(TorrentInfo {
+        name,
+        piece_length,
+        files,
+    })
 }
 
 fn get_dictionary<'a>(
@@ -70,6 +101,13 @@ fn get_dictionary<'a>(
 
 fn get_integer(dictionary: &BTreeMap<Vec<u8>, Bencode>, key: &[u8]) -> Option<i64> {
     dictionary.get(key).and_then(|value| value.as_integer())
+}
+
+fn get_list<'a>(
+    dictionary: &'a BTreeMap<Vec<u8>, Bencode>,
+    key: &'a [u8],
+) -> Option<&'a Vec<Bencode>> {
+    dictionary.get(key).and_then(|value| value.as_list())
 }
 
 fn get_string(dictionary: &BTreeMap<Vec<u8>, Bencode>, key: &[u8]) -> Option<String> {
