@@ -351,4 +351,36 @@ mod tests {
 
         assert_eq!(result, expected);
     }
+
+    #[test]
+    fn it_returns_none_if_not_valid_integer() {
+        let string = Bencode::String(b"bencode".to_vec());
+        let result = string.as_integer();
+
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn it_returns_none_if_not_valid_string() {
+        let integer = Bencode::Integer(123);
+        let result = integer.as_string();
+
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn it_returns_none_if_not_valid_dictionary() {
+        let list = Bencode::List(Vec::new());
+        let result = list.as_dict();
+
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn it_returns_none_if_not_valid_list() {
+        let integer = Bencode::Integer(123);
+        let result = integer.as_list();
+
+        assert!(result.is_none());
+    }
 }
