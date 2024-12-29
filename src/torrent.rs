@@ -7,8 +7,6 @@ use thiserror::Error;
 pub enum TorrentError {
     #[error("invalid dictionary=")]
     InvalidDictionary,
-    #[error("invalid list")]
-    InvalidList,
     #[error("invalid string")]
     InvalidString,
     #[error("invalid torrent file")]
@@ -143,6 +141,10 @@ mod tests {
     fn it_converts_bencode_to_torrent() {
         let mut file_info_dict: BTreeMap<Vec<u8>, Bencode> = BTreeMap::new();
         file_info_dict.insert(b"length".to_vec(), Bencode::Integer(1234));
+        file_info_dict.insert(
+            b"path".to_vec(),
+            Bencode::List(vec![Bencode::String(b"/some/path".to_vec())]),
+        );
 
         let mut info_dictionary: BTreeMap<Vec<u8>, Bencode> = BTreeMap::new();
         info_dictionary.insert(b"name".to_vec(), Bencode::String(b"torrent name".to_vec()));
@@ -174,7 +176,10 @@ mod tests {
             info: TorrentInfo {
                 name: "torrent name".to_string(),
                 piece_length: 123,
-                files: vec![TorrentFile { length: 1234 }],
+                files: vec![TorrentFile {
+                    length: 1234,
+                    path: vec!["/some/path".to_string()],
+                }],
             },
         };
 
