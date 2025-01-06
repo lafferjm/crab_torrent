@@ -37,6 +37,10 @@ pub struct Torrent {
     pub info: TorrentInfo,
 }
 
+pub trait ToBencode {
+    fn to_bencode(&self) -> Result<Vec<u8>, TorrentError>;
+}
+
 impl Torrent {
     pub fn from_bencode(bencode: &Bencode) -> Result<Self, TorrentError> {
         let root = bencode.as_dict().ok_or(TorrentError::InvalidTorrentFile)?;
@@ -60,6 +64,77 @@ impl Torrent {
             creation_date,
             info,
         })
+    }
+}
+
+impl ToBencode for i64 {
+    fn to_bencode(&self) -> Result<Vec<u8>, TorrentError> {
+        let mut result = b"i".to_vec();
+        result.extend_from_slice(self.to_string().as_bytes());
+        result.push(b'e');
+
+        Ok(result)
+    }
+}
+
+impl ToBencode for String {
+    fn to_bencode(&self) -> Result<Vec<u8>, TorrentError> {
+        let mut result = self.len().to_string().as_bytes().to_vec();
+        result.push(b':');
+        result.extend_from_slice(self.as_bytes());
+
+        Ok(result)
+    }
+}
+
+impl ToBencode for Vec<String> {
+    fn to_bencode(&self) -> Result<Vec<u8>, TorrentError> {
+        let mut result = b"l".to_vec();
+        for s in self.into_iter() {
+            result.extend_from_slice(s.to_bencode()?.as_slice());
+        }
+        result.push(b'e');
+
+        Ok(result)
+    }
+}
+
+impl ToBencode for Vec<TorrentFile> {
+    fn to_bencode(&self) -> Result<Vec<u8>, TorrentError> {
+        let mut result = b"d".to_vec();
+        for file in self.into_iter() {
+            result.extend_from_slice(b"6:length".as_slice());
+            result.extend_from_slice(file.length.to_bencode()?.as_slice());
+
+            result.extend_from_slice(b"4:path".as_slice());
+            result.extend_from_slice(file.path.to_bencode()?.as_slice());
+        }
+        result.push(b'e');
+
+        Ok(result)
+    }
+}
+
+impl ToBencode for TorrentInfo {
+    fn to_bencode(&self) -> Result<Vec<u8>, TorrentError> {
+        let mut bencode_bytes: Vec<u8> = Vec::new();
+        bencode_bytes.push(b'd');
+
+        bencode_bytes.extend_from_slice(b"5:files".as_slice());
+        bencode_bytes.extend_from_slice(self.files.to_bencode()?.as_slice());
+
+        bencode_bytes.extend_from_slice(b"4:name".as_slice());
+        bencode_bytes.extend_from_slice(self.name.to_bencode()?.as_slice());
+
+        bencode_bytes.extend_from_slice(b"12:piece length".as_slice());
+        bencode_bytes.extend_from_slice(self.piece_length.to_bencode()?.as_slice());
+
+        bencode_bytes.extend_from_slice(b"6:pieces".as_slice());
+        bencode_bytes.extend_from_slice(self.pieces.to_bencode()?.as_slice());
+
+        bencode_bytes.push(b'e');
+
+        Ok(bencode_bytes)
     }
 }
 

@@ -4,5 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+anyhow = "1.0.95"
 chrono = "0.4.39"
+reqwest = { version = "0.12.11", features = ["blocking"] }
 thiserror = "2.0.9"
