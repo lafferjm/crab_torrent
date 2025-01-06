@@ -37,7 +37,7 @@ pub struct Torrent {
     pub info: TorrentInfo,
 }
 
-pub trait ToBencode {
+trait ToBencode {
     fn to_bencode(&self) -> Result<Vec<u8>, TorrentError>;
 }
 
@@ -64,6 +64,12 @@ impl Torrent {
             creation_date,
             info,
         })
+    }
+
+    pub fn info_hash(&self) -> Result<Vec<u8>, TorrentError> {
+        let bencode_info = self.info.to_bencode()?;
+
+        Ok(bencode_info)
     }
 }
 

@@ -5,7 +5,7 @@ use anyhow::{anyhow, Result};
 use bencode::decode;
 use std::env;
 use std::fs;
-use torrent::{ToBencode, Torrent};
+use torrent::Torrent;
 
 fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
@@ -18,10 +18,10 @@ fn main() -> Result<()> {
     let (decoded_file, _) = decode(&file_contents)?;
 
     let torrent_file = Torrent::from_bencode(&decoded_file).expect("torrent conversion failed");
-
     println!(
         "{}",
-        String::from_utf8_lossy(torrent_file.info.to_bencode()?.as_slice())
+        String::from_utf8_lossy(torrent_file.info_hash()?.as_slice())
     );
+
     Ok(())
 }
