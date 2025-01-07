@@ -1,5 +1,6 @@
 use crate::bencode::Bencode;
 use chrono::{DateTime, Utc};
+use sha1::{Digest, Sha1};
 use std::collections::BTreeMap;
 use thiserror::Error;
 
@@ -69,7 +70,9 @@ impl Torrent {
     pub fn info_hash(&self) -> Result<Vec<u8>, TorrentError> {
         let bencode_info = self.info.to_bencode()?;
 
-        Ok(bencode_info)
+        let result = Sha1::digest(bencode_info).to_vec();
+
+        Ok(result)
     }
 }
 
