@@ -1,12 +1,11 @@
-mod bencode;
 mod torrent;
 
 use anyhow::{anyhow, Result};
-use bencode::decode;
-use percent_encoding::{percent_encode, NON_ALPHANUMERIC};
 use std::env;
 use std::fs;
 use torrent::Torrent;
+use url::Url;
+use urlencoding::encode_binary;
 
 fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
@@ -16,34 +15,23 @@ fn main() -> Result<()> {
 
     let torrent_name = &args[1];
     let file_contents = fs::read(torrent_name).expect("Couldn't read torrent file");
-    let (decoded_file, _) = decode(&file_contents)?;
-
-    let torrent_file = Torrent::from_bencode(&decoded_file).expect("torrent conversion failed");
+    let torrent = Torrent::new(file_contents)?;
 
     let client = reqwest::blocking::Client::new();
-    let response = client
-        .get(&torrent_file.announce)
-        .query(&[
-            (
-                "info_hash",
-                percent_encode(&torrent_file.info_hash()?, NON_ALPHANUMERIC).to_string(),
-            ),
-            (
-                "peer_id",
-                percent_encode(b"-TESTING_TORRENT_CLIENT_123ABC01062025", NON_ALPHANUMERIC)
-                    .to_string(),
-            ),
-            ("downloaded", "0".to_string()),
-            ("uploaded", "0".to_string()),
-            ("left", torrent_file.info.piece_length.to_string()),
-            ("event", "started".to_string()),
-            ("port", "6881".to_string()),
-        ])
-        .send()?;
+    let mut url = Url::parse(&torrent.announce)?;
+
+    let info_hash = torrent.info_hash();
+    let info_hash_string = encode_binary(&info_hash);
+    let sum: i64 = torrent.info.files.iter().map(|b| b.length).sum();
+
+    url.set_query(Some(&format!(
+        "info_hash={}&peer_id={}&downloaded={}&uploaded={}&left={}&event={}&port={}",
+        info_hash_string, "-PC0001-W6R0LID6jXMs", 0, 0, sum, "started", 6881,
+    )));
+
+    let response = client.get(url).send()?;
 
     println!("{}", response.text()?);
-
-    // println!("body = {body:?}");
 
     Ok(())
 }
